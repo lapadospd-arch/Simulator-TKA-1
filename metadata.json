@@ -1,0 +1,5 @@
+{
+  "name": "GenSoal SMPN 4 Mappedeceng",
+  "description": "Generator soal TKA otomatis untuk UPT SMPN 4 Mappedeceng menggunakan Gemini AI.",
+  "requestFramePermissions": []
+}
