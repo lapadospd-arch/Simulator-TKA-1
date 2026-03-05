@@ -21,7 +21,11 @@ import {
   ArrowRight,
   ArrowLeft,
   Key,
-  Settings
+  Settings,
+  Circle,
+  Square,
+  CheckSquare,
+  CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -658,14 +662,14 @@ export default function App() {
                             
                             if (currentQuestion.type === 'PGK_KATEGORI') {
                               return (
-                                <div key={option.key} className="p-5 rounded-2xl border-2 border-slate-100 bg-white space-y-4">
+                                <div key={option.key} className="p-5 rounded-2xl border-2 border-slate-100 bg-white space-y-4 transition-all hover:border-indigo-100">
                                   <div className="flex items-start gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
                                       {option.key}
                                     </div>
                                     <span className="font-medium text-slate-700 pt-2">{option.text}</span>
                                   </div>
-                                  <div className="flex gap-2 ml-14">
+                                  <div className="flex gap-3 ml-14">
                                     {["Benar", "Salah"].map((cat) => {
                                       const isCatSelected = userAnswer?.[option.key] === cat;
                                       const isCatCorrect = currentQuestion.correctAnswer?.[option.key] === cat;
@@ -676,18 +680,19 @@ export default function App() {
                                           disabled={isChecked}
                                           onClick={() => handleAnswerSelect(option.key, cat)}
                                           className={cn(
-                                            "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                                            "flex-1 px-6 py-3 rounded-xl text-sm font-bold transition-all border-2 flex items-center justify-center gap-2",
                                             isChecked
                                               ? isCatCorrect
-                                                ? "bg-emerald-600 text-white border-emerald-600"
+                                                ? "bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-100"
                                                 : isCatSelected
-                                                  ? "bg-red-600 text-white border-red-600"
+                                                  ? "bg-red-600 text-white border-red-600 shadow-lg shadow-red-100"
                                                   : "bg-slate-50 text-slate-400 border-slate-100"
                                               : isCatSelected
-                                                ? "bg-indigo-600 text-white border-indigo-600"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:bg-slate-50"
                                           )}
                                         >
+                                          {isCatSelected && <CheckCircle className="w-4 h-4" />}
                                           {cat}
                                         </button>
                                       );
@@ -703,7 +708,7 @@ export default function App() {
                                 onClick={() => handleAnswerSelect(option.key)}
                                 disabled={isChecked}
                                 className={cn(
-                                  "flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all group",
+                                  "flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all group relative",
                                   isChecked 
                                     ? isCorrect 
                                       ? "bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500" 
@@ -711,7 +716,7 @@ export default function App() {
                                         ? "bg-red-50 border-red-500 ring-1 ring-red-500"
                                         : "bg-slate-50 border-slate-100 opacity-60"
                                     : isSelected
-                                      ? "bg-indigo-50 border-indigo-600 ring-1 ring-indigo-600"
+                                      ? "bg-indigo-50 border-indigo-600 ring-1 ring-indigo-600 shadow-md shadow-indigo-50"
                                       : "bg-white border-slate-100 hover:border-indigo-200 hover:bg-slate-50"
                                 )}
                               >
@@ -730,7 +735,7 @@ export default function App() {
                                   {option.key}
                                 </div>
                                 <span className={cn(
-                                  "font-medium",
+                                  "font-medium flex-1",
                                   isChecked
                                     ? isCorrect
                                       ? "text-emerald-900"
@@ -741,8 +746,19 @@ export default function App() {
                                 )}>
                                   {option.text}
                                 </span>
-                                {isChecked && isCorrect && <CheckCircle2 className="w-5 h-5 ml-auto text-emerald-600" />}
-                                {isChecked && isSelected && !isCorrect && <XCircle className="w-5 h-5 ml-auto text-red-600" />}
+                                
+                                {/* Selection Indicators */}
+                                <div className="ml-auto flex items-center gap-2">
+                                  {!isChecked && (
+                                    currentQuestion.type === 'PGK_MCMA' ? (
+                                      isSelected ? <CheckSquare className="w-5 h-5 text-indigo-600" /> : <Square className="w-5 h-5 text-slate-300 group-hover:text-indigo-300" />
+                                    ) : (
+                                      isSelected ? <CheckCircle className="w-5 h-5 text-indigo-600" /> : <Circle className="w-5 h-5 text-slate-300 group-hover:text-indigo-300" />
+                                    )
+                                  )}
+                                  {isChecked && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                                  {isChecked && isSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-600" />}
+                                </div>
                               </button>
                             );
                           })}
@@ -967,7 +983,7 @@ export default function App() {
             <School className="w-5 h-5 text-slate-400" />
             <span className="text-sm font-bold text-slate-500 tracking-tight">UPT SMPN 4 Mappedeceng</span>
           </div>
-          <p className="text-xs text-slate-400">© 2024 Sistem Simulator TKA AI</p>
+          <p className="text-xs text-slate-400">© 2026 Sistem Simulator TKA AI Created by Lapado</p>
         </div>
       </footer>
 
