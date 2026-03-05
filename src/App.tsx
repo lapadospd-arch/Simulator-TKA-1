@@ -15,7 +15,6 @@ import {
   AlertCircle,
   Loader2,
   ChevronRight,
-  School,
   Trophy,
   RotateCcw,
   ArrowRight,
@@ -345,8 +344,13 @@ export default function App() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <School className="w-6 h-6 text-white" />
+            <div className="bg-white p-1 rounded-lg border border-slate-100 shadow-sm">
+              <img 
+                src="https://iili.io/qnFW2kJ.png" 
+                alt="Logo" 
+                className="w-10 h-10 object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-slate-900">Simulator TKA</h1>
@@ -593,7 +597,12 @@ export default function App() {
                   >
                     <div className="relative mb-8">
                       <div className="w-24 h-24 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                      <School className="w-8 h-8 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                      <img 
+                        src="https://iili.io/qnFW2kJ.png" 
+                        alt="Logo" 
+                        className="w-10 h-10 object-contain absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
                     <h3 className="text-xl font-bold text-slate-800 mb-2">Menyiapkan Ruang Ujian...</h3>
                     <p className="text-slate-500 max-w-sm">
@@ -980,7 +989,12 @@ export default function App() {
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-slate-200 mt-12">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <School className="w-5 h-5 text-slate-400" />
+            <img 
+              src="https://iili.io/qnFW2kJ.png" 
+              alt="Logo" 
+              className="w-6 h-6 object-contain grayscale opacity-70"
+              referrerPolicy="no-referrer"
+            />
             <span className="text-sm font-bold text-slate-500 tracking-tight">UPT SMPN 4 Mappedeceng</span>
           </div>
           <p className="text-xs text-slate-400">© 2026 Sistem Simulator TKA AI Created by Lapado</p>
