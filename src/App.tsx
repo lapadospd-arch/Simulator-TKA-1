@@ -36,12 +36,13 @@ function cn(...inputs: ClassValue[]) {
 // Types
 interface Question {
   id: number;
+  type: "PG" | "PGK_MCMA" | "PGK_KATEGORI";
   text: string;
   options: {
     key: string; // A, B, C, D
     text: string;
   }[];
-  correctAnswer: string; // A, B, C, or D
+  correctAnswer: any; // String for PG, Array for MCMA, Object for Kategori
   explanation: string;
 }
 
@@ -53,6 +54,7 @@ interface QuestionParams {
   topic: string;
   cognitiveLevel: string;
   subTopic: string;
+  questionType: string;
 }
 
 const SUBJECTS = [
@@ -92,6 +94,11 @@ const MATH_SUB_TOPICS = [
 
 const GRADES = ["7", "8", "9"];
 const DIFFICULTIES = ["Mudah", "Sedang", "Sulit"];
+const QUESTION_TYPES = [
+  { id: "PG", label: "Pilihan Ganda Biasa" },
+  { id: "PGK_MCMA", label: "Pilihan Ganda Kompleks Model MCMA" },
+  { id: "PGK_KATEGORI", label: "Pilihan Ganda Kompleks Kategori" }
+];
 
 export default function App() {
   const [params, setParams] = useState<QuestionParams>({
@@ -101,7 +108,8 @@ export default function App() {
     difficulty: "Sedang",
     topic: "",
     cognitiveLevel: "Semua Level",
-    subTopic: "Umum"
+    subTopic: "Umum",
+    questionType: "PG"
   });
 
   const [customApiKey, setCustomApiKey] = useState<string>(() => {
@@ -111,7 +119,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<number, any>>({});
   const [checkedQuestions, setCheckedQuestions] = useState<Record<number, boolean>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +154,7 @@ export default function App() {
         Kelas: ${params.grade}
         Sub-Materi: ${params.subject === 'Matematika' ? params.subTopic : (params.topic || 'Umum')}
         Level Kognitif: ${params.cognitiveLevel}
+        Bentuk Soal: ${QUESTION_TYPES.find(t => t.id === params.questionType)?.label}
         Jumlah Soal: ${params.count}
         Tingkat Kesulitan: ${params.difficulty}
         
@@ -154,6 +163,11 @@ export default function App() {
         - Pastikan soal menantang nalar (HOTS).
         - WAJIB memberikan penjelasan logika yang sangat mendetail, langkah demi langkah, agar siswa paham mengapa jawaban tersebut benar.
         - Output HARUS berupa valid JSON array of objects.
+        
+        Aturan Khusus Bentuk Soal:
+        1. PG (Pilihan Ganda Biasa): 1 jawaban benar dari 4 pilihan (A, B, C, D). correctAnswer berupa string (misal: "A").
+        2. PGK_MCMA (Pilihan Ganda Kompleks MCMA): Bisa lebih dari 1 jawaban benar. correctAnswer berupa array string (misal: ["A", "C"]).
+        3. PGK_KATEGORI (Pilihan Ganda Kompleks Kategori): Setiap opsi harus dikategorikan (misal: Benar/Salah). correctAnswer berupa object (misal: {"A": "Benar", "B": "Salah", "C": "Benar", "D": "Salah"}).
       `;
 
       const response = await ai.models.generateContent({
@@ -167,6 +181,7 @@ export default function App() {
               type: Type.OBJECT,
               properties: {
                 id: { type: Type.INTEGER },
+                type: { type: Type.STRING, description: "PG, PGK_MCMA, atau PGK_KATEGORI" },
                 text: { type: Type.STRING, description: "Teks pertanyaan dalam Markdown" },
                 options: {
                   type: Type.ARRAY,
@@ -179,10 +194,10 @@ export default function App() {
                     required: ["key", "text"]
                   }
                 },
-                correctAnswer: { type: Type.STRING, description: "A, B, C, atau D" },
+                correctAnswer: { type: Type.STRING, description: "Bisa string, array, atau object sesuai tipe" },
                 explanation: { type: Type.STRING, description: "Penjelasan logika jawaban yang sangat detail" }
               },
-              required: ["id", "text", "options", "correctAnswer", "explanation"]
+              required: ["id", "type", "text", "options", "correctAnswer", "explanation"]
             }
           }
         }
@@ -198,7 +213,23 @@ export default function App() {
         if (!Array.isArray(data) || data.length === 0) {
           throw new Error("Data soal kosong atau format tidak valid.");
         }
-        setQuestions(data);
+        
+        // Post-process to ensure correct types for correctAnswer
+        const processedData = data.map(q => {
+          let parsedCorrectAnswer = q.correctAnswer;
+          if (typeof q.correctAnswer === 'string') {
+            try {
+              if (q.correctAnswer.startsWith('[') || q.correctAnswer.startsWith('{')) {
+                parsedCorrectAnswer = JSON.parse(q.correctAnswer);
+              }
+            } catch (e) {
+              // Not JSON, keep as string
+            }
+          }
+          return { ...q, correctAnswer: parsedCorrectAnswer };
+        });
+        
+        setQuestions(processedData);
       } catch (parseErr) {
         console.error("JSON Parse Error:", parseErr, "Raw Text:", text);
         throw new Error("Gagal membaca format data soal. Silakan coba lagi.");
@@ -219,17 +250,53 @@ export default function App() {
     }
   };
 
-  const handleAnswerSelect = (optionKey: string) => {
+  const handleAnswerSelect = (optionKey: string, categoryValue?: string) => {
     if (isSubmitted || checkedQuestions[questions[currentQuestionIndex].id]) return;
-    setUserAnswers({
-      ...userAnswers,
-      [questions[currentQuestionIndex].id]: optionKey
-    });
+    
+    const currentQuestion = questions[currentQuestionIndex];
+    const currentId = currentQuestion.id;
+    const currentAnswer = userAnswers[currentId];
+
+    if (currentQuestion.type === 'PGK_MCMA') {
+      const prevAnswers = Array.isArray(currentAnswer) ? currentAnswer : [];
+      const newAnswers = prevAnswers.includes(optionKey)
+        ? prevAnswers.filter(a => a !== optionKey)
+        : [...prevAnswers, optionKey];
+      
+      setUserAnswers({
+        ...userAnswers,
+        [currentId]: newAnswers
+      });
+    } else if (currentQuestion.type === 'PGK_KATEGORI') {
+      const prevAnswers = currentAnswer && typeof currentAnswer === 'object' ? currentAnswer : {};
+      setUserAnswers({
+        ...userAnswers,
+        [currentId]: {
+          ...prevAnswers,
+          [optionKey]: categoryValue
+        }
+      });
+    } else {
+      // Default PG
+      setUserAnswers({
+        ...userAnswers,
+        [currentId]: optionKey
+      });
+    }
   };
 
   const checkCurrentAnswer = () => {
     const currentId = questions[currentQuestionIndex].id;
-    if (!userAnswers[currentId]) return;
+    const currentQuestion = questions[currentQuestionIndex];
+    const answer = userAnswers[currentId];
+    
+    if (!answer) return;
+    
+    // For Kategori, ensure all options are answered
+    if (currentQuestion.type === 'PGK_KATEGORI') {
+      if (Object.keys(answer).length < currentQuestion.options.length) return;
+    }
+    
     setCheckedQuestions({
       ...checkedQuestions,
       [currentId]: true
@@ -239,8 +306,22 @@ export default function App() {
   const calculateScore = () => {
     let correct = 0;
     questions.forEach(q => {
-      if (userAnswers[q.id] === q.correctAnswer) {
-        correct++;
+      const userAnswer = userAnswers[q.id];
+      if (q.type === 'PGK_MCMA') {
+        if (Array.isArray(userAnswer) && Array.isArray(q.correctAnswer)) {
+          const isMatch = userAnswer.length === q.correctAnswer.length && 
+                          userAnswer.every(a => q.correctAnswer.includes(a));
+          if (isMatch) correct++;
+        }
+      } else if (q.type === 'PGK_KATEGORI') {
+        if (userAnswer && typeof userAnswer === 'object' && q.correctAnswer && typeof q.correctAnswer === 'object') {
+          const isMatch = Object.keys(q.correctAnswer).every(key => userAnswer[key] === q.correctAnswer[key]);
+          if (isMatch) correct++;
+        }
+      } else {
+        if (userAnswer === q.correctAnswer) {
+          correct++;
+        }
       }
     });
     return Math.round((correct / questions.length) * 100);
@@ -417,6 +498,20 @@ export default function App() {
                     </select>
                   </div>
 
+                  {/* Question Type */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                      <Settings className="w-3.5 h-3.5" /> Bentuk Soal
+                    </label>
+                    <select 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none font-medium"
+                      value={params.questionType}
+                      onChange={(e) => setParams({...params, questionType: e.target.value})}
+                    >
+                      {QUESTION_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                  </div>
+
                   {/* Sub Topic for Math or Generic Topic */}
                   {params.subject === 'Matematika' ? (
                     <div className="space-y-2">
@@ -533,10 +628,65 @@ export default function App() {
 
                         <div className="grid grid-cols-1 gap-4">
                           {questions[currentQuestionIndex].options.map((option) => {
-                            const isSelected = userAnswers[questions[currentQuestionIndex].id] === option.key;
-                            const isChecked = checkedQuestions[questions[currentQuestionIndex].id];
-                            const isCorrect = option.key === questions[currentQuestionIndex].correctAnswer;
+                            const currentQuestion = questions[currentQuestionIndex];
+                            const userAnswer = userAnswers[currentQuestion.id];
+                            const isChecked = checkedQuestions[currentQuestion.id];
                             
+                            let isSelected = false;
+                            let isCorrect = false;
+
+                            if (currentQuestion.type === 'PGK_MCMA') {
+                              isSelected = Array.isArray(userAnswer) && userAnswer.includes(option.key);
+                              isCorrect = Array.isArray(currentQuestion.correctAnswer) && currentQuestion.correctAnswer.includes(option.key);
+                            } else if (currentQuestion.type === 'PGK_KATEGORI') {
+                              isSelected = userAnswer && typeof userAnswer === 'object' && !!userAnswer[option.key];
+                              isCorrect = currentQuestion.correctAnswer && typeof currentQuestion.correctAnswer === 'object' && !!currentQuestion.correctAnswer[option.key];
+                            } else {
+                              isSelected = userAnswer === option.key;
+                              isCorrect = option.key === currentQuestion.correctAnswer;
+                            }
+                            
+                            if (currentQuestion.type === 'PGK_KATEGORI') {
+                              return (
+                                <div key={option.key} className="p-5 rounded-2xl border-2 border-slate-100 bg-white space-y-4">
+                                  <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-sm shrink-0">
+                                      {option.key}
+                                    </div>
+                                    <span className="font-medium text-slate-700 pt-2">{option.text}</span>
+                                  </div>
+                                  <div className="flex gap-2 ml-14">
+                                    {["Benar", "Salah"].map((cat) => {
+                                      const isCatSelected = userAnswer?.[option.key] === cat;
+                                      const isCatCorrect = currentQuestion.correctAnswer?.[option.key] === cat;
+                                      
+                                      return (
+                                        <button
+                                          key={cat}
+                                          disabled={isChecked}
+                                          onClick={() => handleAnswerSelect(option.key, cat)}
+                                          className={cn(
+                                            "px-4 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                                            isChecked
+                                              ? isCatCorrect
+                                                ? "bg-emerald-600 text-white border-emerald-600"
+                                                : isCatSelected
+                                                  ? "bg-red-600 text-white border-red-600"
+                                                  : "bg-slate-50 text-slate-400 border-slate-100"
+                                              : isCatSelected
+                                                ? "bg-indigo-600 text-white border-indigo-600"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
+                                          )}
+                                        >
+                                          {cat}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             return (
                               <button
                                 key={option.key}
@@ -618,8 +768,12 @@ export default function App() {
                           </button>
                         </div>
 
-                        <div className="flex gap-3">
-                          {!checkedQuestions[questions[currentQuestionIndex].id] && userAnswers[questions[currentQuestionIndex].id] && (
+                      <div className="flex gap-3">
+                          {!checkedQuestions[questions[currentQuestionIndex].id] && (
+                            (questions[currentQuestionIndex].type === 'PG' && userAnswers[questions[currentQuestionIndex].id]) ||
+                            (questions[currentQuestionIndex].type === 'PGK_MCMA' && userAnswers[questions[currentQuestionIndex].id]?.length > 0) ||
+                            (questions[currentQuestionIndex].type === 'PGK_KATEGORI' && userAnswers[questions[currentQuestionIndex].id] && Object.keys(userAnswers[questions[currentQuestionIndex].id]).length === questions[currentQuestionIndex].options.length)
+                          ) && (
                             <button
                               onClick={checkCurrentAnswer}
                               className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-100 transition-all flex items-center gap-2"
@@ -709,24 +863,62 @@ export default function App() {
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 ml-12">
-                                {q.options.map(opt => (
-                                  <div 
-                                    key={opt.key}
-                                    className={cn(
-                                      "p-3 rounded-xl border text-sm flex items-center gap-3",
-                                      opt.key === q.correctAnswer 
-                                        ? "bg-emerald-50 border-emerald-200 text-emerald-900 font-bold"
-                                        : opt.key === userAnswers[q.id]
-                                          ? "bg-red-50 border-red-200 text-red-900"
-                                          : "bg-slate-50 border-slate-100 text-slate-500"
-                                    )}
-                                  >
-                                    <span className="w-6 h-6 rounded bg-white border border-inherit flex items-center justify-center text-xs">{opt.key}</span>
-                                    {opt.text}
-                                    {opt.key === q.correctAnswer && <CheckCircle2 className="w-4 h-4 ml-auto" />}
-                                    {opt.key === userAnswers[q.id] && !isCorrect && <XCircle className="w-4 h-4 ml-auto" />}
-                                  </div>
-                                ))}
+                                {q.options.map(opt => {
+                                  let isOptSelected = false;
+                                  let isOptCorrect = false;
+
+                                  if (q.type === 'PGK_MCMA') {
+                                    isOptSelected = Array.isArray(userAnswers[q.id]) && userAnswers[q.id].includes(opt.key);
+                                    isOptCorrect = Array.isArray(q.correctAnswer) && q.correctAnswer.includes(opt.key);
+                                  } else if (q.type === 'PGK_KATEGORI') {
+                                    // For Kategori review, we just show the correct category
+                                    return (
+                                      <div key={opt.key} className="p-3 rounded-xl border text-sm bg-slate-50 border-slate-100">
+                                        <div className="flex justify-between items-center">
+                                          <div className="flex items-center gap-2">
+                                            <span className="w-6 h-6 rounded bg-white border border-slate-200 flex items-center justify-center text-xs">{opt.key}</span>
+                                            <span className="text-slate-700">{opt.text}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold uppercase text-slate-400">Jawaban:</span>
+                                            <span className={cn(
+                                              "px-2 py-0.5 rounded text-[10px] font-bold",
+                                              userAnswers[q.id]?.[opt.key] === q.correctAnswer?.[opt.key] ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                            )}>
+                                              {userAnswers[q.id]?.[opt.key] || "-"}
+                                            </span>
+                                            <span className="text-[10px] font-bold uppercase text-slate-400">Kunci:</span>
+                                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                                              {q.correctAnswer?.[opt.key]}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  } else {
+                                    isOptSelected = userAnswers[q.id] === opt.key;
+                                    isOptCorrect = opt.key === q.correctAnswer;
+                                  }
+
+                                  return (
+                                    <div 
+                                      key={opt.key}
+                                      className={cn(
+                                        "p-3 rounded-xl border text-sm flex items-center gap-3",
+                                        isOptCorrect 
+                                          ? "bg-emerald-50 border-emerald-200 text-emerald-900 font-bold"
+                                          : isOptSelected
+                                            ? "bg-red-50 border-red-200 text-red-900"
+                                            : "bg-slate-50 border-slate-100 text-slate-500"
+                                      )}
+                                    >
+                                      <span className="w-6 h-6 rounded bg-white border border-inherit flex items-center justify-center text-xs">{opt.key}</span>
+                                      {opt.text}
+                                      {isOptCorrect && <CheckCircle2 className="w-4 h-4 ml-auto" />}
+                                      {isOptSelected && !isOptCorrect && <XCircle className="w-4 h-4 ml-auto" />}
+                                    </div>
+                                  );
+                                })}
                               </div>
 
                               <div className="ml-12 p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100">
