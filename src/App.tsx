@@ -622,8 +622,18 @@ export default function App() {
                     {/* Question Card */}
                     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                       <div className="p-8 md:p-12">
-                        <div className="prose prose-slate prose-indigo max-w-none mb-10 text-lg font-medium leading-relaxed">
+                        <div className="prose prose-slate prose-indigo max-w-none mb-6 text-lg font-medium leading-relaxed">
                           <ReactMarkdown>{questions[currentQuestionIndex].text}</ReactMarkdown>
+                        </div>
+
+                        {/* Question Instruction */}
+                        <div className="mb-8 flex items-center gap-2 text-indigo-600 bg-indigo-50/50 px-4 py-2 rounded-xl border border-indigo-100 w-fit">
+                          <AlertCircle className="w-4 h-4" />
+                          <span className="text-xs font-bold">
+                            {questions[currentQuestionIndex].type === 'PG' && "Pilih salah satu jawaban yang paling tepat."}
+                            {questions[currentQuestionIndex].type === 'PGK_MCMA' && "Pilih satu atau lebih jawaban yang benar."}
+                            {questions[currentQuestionIndex].type === 'PGK_KATEGORI' && "Tentukan kategori (Benar/Salah) untuk setiap pernyataan berikut."}
+                          </span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -857,9 +867,19 @@ export default function App() {
                                 )}>
                                   {idx + 1}
                                 </div>
-                                <div className="prose prose-slate max-w-none text-slate-800">
+                                <div className="prose prose-slate max-w-none text-slate-800 mb-4">
                                   <ReactMarkdown>{q.text}</ReactMarkdown>
                                 </div>
+                              </div>
+
+                              {/* Question Instruction in Review */}
+                              <div className="mb-6 ml-12 flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">
+                                  {q.type === 'PG' && "Pilihan Ganda Biasa"}
+                                  {q.type === 'PGK_MCMA' && "Pilihan Ganda Kompleks (Pilih > 1)"}
+                                  {q.type === 'PGK_KATEGORI' && "Pilihan Ganda Kompleks (Kategori)"}
+                                </span>
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 ml-12">
